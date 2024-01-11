@@ -1,0 +1,77 @@
+name: CI and Deploy
+
+# Idea is:
+# CI runs on push to main, push a tag, and pull requests
+# Dependencies are: ci -> dev -> staging -> production
+# Gates are:
+# - dev is deployed from main
+# - staging is deployed from main, when commit is tagged
+# - production is deployed from the same commit as staging, after a manual approval
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+      - name: Dump job context
+        env:
+          JOB_CONTEXT: ${{ toJson(job) }}
+        run: echo "$JOB_CONTEXT"
+      - name: Dump steps context
+        env:
+          STEPS_CONTEXT: ${{ toJson(steps) }}
+        run: echo "$STEPS_CONTEXT"
+      - name: Dump runner context
+        env:
+          RUNNER_CONTEXT: ${{ toJson(runner) }}
+        run: echo "$RUNNER_CONTEXT"
+      - name: Dump strategy context
+        env:
+          STRATEGY_CONTEXT: ${{ toJson(strategy) }}
+        run: echo "$STRATEGY_CONTEXT"
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+
+  deploy-dev:
+    if: github.ref_name == 'main'
+    concurrency: deploy-dev
+    needs: ci
+    runs-on: ubuntu-latest
+    environment:
+      name: Dev
+    steps:
+      - run: echo Now Deploy to Dev
+
+  deploy-staging:
+    if: startsWith(github.ref, 'refs/tags/v')
+    concurrency: deploy-staging
+    needs: ci
+    runs-on: ubuntu-latest
+    environment:
+      name: Staging
+    steps:
+      - run: echo Now Deploy to Staging
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+
+  deploy-prod:
+    concurrency: deploy-prod
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+    steps:
+      - run: echo Now Deploy to Production
